@@ -5,6 +5,8 @@ Honors Algorithms Course - Mining Problem
 This is a substantially harder version than the one given out at the National Progamming Team Competition.  
 Students are not allowed to share their work WITH EACH OTHER. All work is to be done alone.  
 California State University - Long Beach  
+This program utilizes Edmonds-Karp Algorithm to find a solution to the Max Flow - Min cut Problem  
+using BFS to push flow throughout the Graph and DFS to find the min cut.  
 
 You are a mining engineer and have the following problem presented to you.  
 There is a rectangular two-dimensional pit of known width and depth. Using  
