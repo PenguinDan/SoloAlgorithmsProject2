@@ -1,6 +1,11 @@
 # SoloAlgorithmsProject2
 This Project demonstrates my knowledge and mastery in Network Flow Algorithms.
 
+Honors Algorithms Course - Mining Problem  
+This is a substantially harder version than the one given out at the National Progamming Team Competition.  
+Students are not allowed to share their work WITH EACH OTHER. All work is to be done alone.  
+California State University - Long Beach  
+
 You are a mining engineer and have the following problem presented to you.  
 There is a rectangular two-dimensional pit of known width and depth. Using  
 various engineering techniques, the compositions of all of the blocks of ore in  
