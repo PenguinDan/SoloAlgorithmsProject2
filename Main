@@ -1,0 +1,416 @@
+package pkg328mining;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Scanner;
+
+/**
+ *
+ * @author Daniel Kim
+ */
+public class Main {
+
+    static final int FINAL_VERTEX = -1;
+    static int ARRAY_SIZE = 0;
+    static int[] sinkArray;
+    static int[] sourceArray;
+    static String connectedString = "";
+    static final int INFINITY = Integer.MAX_VALUE;
+
+    /**
+     * @param args the command line arguments
+     */
+    public static void main(String[] args) {
+
+        try {
+            //Add each line of values into one array, create a vertex object for each values input from the text file
+            ArrayList<ArrayList<Vertex>> array2D = new ArrayList<ArrayList<Vertex>>();
+            Scanner input = new Scanner(new File("pit.txt"));
+            int width, cost, value, rowLevel = 0;
+            short nextBlockIt = 0;
+            String inputLine;
+            int arrayIt = 0, blockID = 0;
+            Vertex prevVertex = null;
+
+            while (input.hasNextLine()) {
+                inputLine = input.nextLine();
+                array2D.add(new ArrayList<Vertex>());
+                ArrayList<Vertex> currArray = array2D.get(arrayIt);
+
+                String[] splitInputLine = inputLine.split(",");
+                for (int i = 0; i + 3 <= splitInputLine.length; i += 3) {
+                    width = Integer.parseInt(splitInputLine[i].substring(1));
+                    value = Integer.parseInt(splitInputLine[i + 1]);
+                    cost = Integer.parseInt(splitInputLine[i + 2].substring(0, splitInputLine[i + 2].indexOf(")")));
+                    Vertex vertex = new Vertex(width, value, cost, blockID, rowLevel);
+                    currArray.add(vertex);
+                    if (prevVertex != null) {
+                        prevVertex.setNextBlockIt(nextBlockIt);
+                    }
+                    prevVertex = vertex;
+                    nextBlockIt += (short) vertex.getWidth();
+                    blockID++;
+                    rowLevel++;
+                }
+                rowLevel = 0;
+                nextBlockIt = 0;
+                arrayIt++;
+                prevVertex = null;
+            }
+            input.close();
+
+            ARRAY_SIZE = blockID;
+
+            //--------------------------------------------------------------------------------------------------------------
+            //Connect positive value vertexes to source and negative value vertexes to sink
+            ArrayList<Vertex> source = new ArrayList<Vertex>();
+            ArrayList<Vertex> sink = new ArrayList<Vertex>();
+            ArrayList<Vertex> currArray;
+
+            for (int i = 0; i < array2D.size(); i++) {
+                currArray = array2D.get(i);
+                for (int j = 0; j < currArray.size(); j++) {
+                    if (currArray.get(j).getValue() >= 0) {
+                        source.add(currArray.get(j));
+                    }
+                    else {
+                        sink.add(currArray.get(j));
+                    }
+                }
+            }
+            currArray = null;
+            //---------------------------------------------------------------------------------------------------------------
+            //Create a Matrix to connect correct vertices to all of their prerequisites
+            //This takes exactly columnCount * sum amount of time.
+            int sum = 0;
+            currArray = array2D.get(0);
+            for (int i = 0; i < currArray.size(); i++) {
+                sum += currArray.get(i).getWidth();
+            }
+            final int columnCount = array2D.size();
+            Vertex[][] vertexMatrix = new Vertex[columnCount][sum];
+            Vertex currVertex = null;
+            arrayIt = 0;
+
+            for (int i = 0; i < array2D.size(); i++) {
+                currArray = array2D.get(i);
+                for (int j = 0; j < currArray.size(); j++) {
+                    currVertex = currArray.get(j);
+                    for (int k = 0; k < currVertex.getWidth(); k++) {
+                        vertexMatrix[i][arrayIt] = currVertex;
+                        arrayIt++;
+                    }
+                }
+                arrayIt = 0;
+            }
+
+            //-----------------------------------------------------------------------------------------------------------------
+            //Create connections between each vertex to another vertex(Prerequisite)
+            //Use sums to quickly create connections between vertexes
+            //Thereby creating an adjacency list
+            currArray = null;
+            arrayIt = 0;
+            int currVertexEndIt = 0;
+            int topVertexIt = 0;
+            HashMap<String, Integer> residualGraph = new HashMap<String, Integer>();
+            String connectedToString = "", connectedFromString = "";
+
+            for (int i = 1; i < array2D.size(); i++) {
+                currArray = array2D.get(i);
+                arrayIt = i - 1;
+                while (arrayIt >= 0) {
+                    for (int j = 0; j < currArray.size(); j++) {
+                        currVertex = currArray.get(j);
+                        if (currVertex.getNextBlockIt() == -1) {
+                            currVertexEndIt = sum - 1;
+                        }
+                        else {
+                            currVertexEndIt = currVertex.getNextBlockIt() - 1;
+                        }
+                        topVertexIt = currVertexEndIt - (currVertex.getWidth() - 1);
+
+                        while (true) {
+                            prevVertex = vertexMatrix[arrayIt][topVertexIt];
+                            connectedToString = currVertex.getID() + "," + prevVertex.getID();
+                            residualGraph.put(connectedToString, INFINITY);
+                            connectedFromString = prevVertex.getID() + "," + currVertex.getID();
+                            residualGraph.put(connectedFromString, 0);
+                            currVertex.addConnectedTo(prevVertex);
+                            prevVertex.addConnectedFrom(currVertex);
+
+                            nextBlockIt = prevVertex.getNextBlockIt();
+                            if (nextBlockIt == -1 || nextBlockIt > currVertexEndIt) {
+                                break;
+                            }
+                            else {
+                                topVertexIt = nextBlockIt;
+                            }
+                        }
+                    }
+                    arrayIt--;
+                }
+            }
+
+            //----------------------------------------------------------------------------------------------------------------------
+            //Capacity values are stored in the Vertex object, these will keep track of flow values.
+            //These values are the source to vertex / sink to vertex edge values.
+            //Keep track of values for debugging purposes
+            sourceArray = new int[ARRAY_SIZE];
+            sinkArray = new int[ARRAY_SIZE];
+            Arrays.fill(sourceArray, 0);
+            Arrays.fill(sinkArray, 0);
+
+            for (int i = 0; i < source.size(); i++) {
+                value = source.get(i).getValue();
+                arrayIt = source.get(i).getID();
+                sourceArray[arrayIt] = value;
+            }
+
+            for (int i = 0; i < sink.size(); i++) {
+                value = sink.get(i).getValue();
+                arrayIt = sink.get(i).getID();
+                sinkArray[arrayIt] = value * -1;
+            }
+
+            //------------------------------------------------------------------------------------------------------------------------
+            //Continuously update sink and source values until you cannot find a path from a source to a sink.
+            //Do not need to find paths for now, just update all the values and create hashmaps to set the residual edge graphs
+            //Pump out flow from source until you can't anymore
+            HashMap<Integer, Vertex> hashMap = new HashMap<Integer, Vertex>();
+            int sourceID = 0, sinkID = 0;
+            int sourceValue = 0, sinkValue = 0, flowValue = 0;
+            int minFlowValue = 0;
+            prevVertex = null;
+            Vertex[] path = null;
+            Vertex sinkVertex = null;
+
+            hashMap.put(FINAL_VERTEX, null);
+
+            for (int i = 0; i < source.size(); i++) {
+                currVertex = source.get(i);
+                sourceID = currVertex.getID();
+
+                while (true) {
+                    path = findAvailableVertex(currVertex, hashMap, residualGraph);
+                    sinkVertex = hashMap.get(FINAL_VERTEX);
+
+                    if (sinkVertex != null) {
+                        sinkID = sinkVertex.getID();
+                        sourceValue = sourceArray[sourceID];
+                        sinkValue = sinkArray[sinkID];
+                        minFlowValue = (sourceValue < sinkValue) ? sourceValue : sinkValue;
+
+                        for (int j = sinkVertex.getID(); j != currVertex.getID(); j = prevVertex.getID()) {
+                            prevVertex = path[j];
+                            connectedFromString = prevVertex.getID() + "," + j;
+                            flowValue = residualGraph.get(connectedFromString);
+                            if (flowValue < minFlowValue) {
+                                minFlowValue = flowValue;
+                            }
+                        }
+
+                        sourceArray[sourceID] -= minFlowValue;
+                        sinkArray[sinkID] -= minFlowValue;
+
+                        for (int j = sinkVertex.getID(); j != currVertex.getID(); j = prevVertex.getID()) {
+                            prevVertex = path[j];
+                            connectedToString = j + "," + prevVertex.getID();
+                            flowValue = residualGraph.get(connectedToString);
+
+                            if (flowValue != INFINITY) {
+                                residualGraph.replace(connectedToString, flowValue + minFlowValue);
+                            }
+                            else {
+                                connectedFromString = prevVertex.getID() + "," + j;
+                                flowValue = residualGraph.get(connectedFromString);
+                                residualGraph.replace(connectedFromString, flowValue - minFlowValue);
+                            }
+                        }
+                    }
+                    else {
+                        break;
+                    }
+                    if (sourceArray[currVertex.getID()] == 0) {
+                        break;
+                    }
+                }
+            }
+            //-------------------------------------------------------------------------------------------------------------------------------
+            //Create an arraylist that combines both all the sink vertexes and all of the source vertex
+            //Use DFS to find vertexes that go from reachable to unreachable and mark every visited vertex true
+            boolean[] visited = new boolean[ARRAY_SIZE];
+            ArrayList<Vertex> mineableBlocks = new ArrayList<Vertex>();
+            Arrays.fill(visited, false);
+            final int EMPTY_FLOW = 0;
+
+            for (int i = 0; i < source.size(); i++) {
+                currVertex = source.get(i);
+                sourceID = currVertex.getID();
+                flowValue = sourceArray[sourceID];
+
+                if (!visited[sourceID] && flowValue != EMPTY_FLOW) {
+                    DFS(residualGraph, visited, currVertex);
+                }
+            }
+
+            for (int i = 0; i < source.size(); i++) {
+                currVertex = source.get(i);
+                sourceID = currVertex.getID();
+
+                if (visited[sourceID]) {
+                    mineableBlocks.add(currVertex);
+                }
+            }
+
+            for (int i = 0; i < sink.size(); i++) {
+                sinkVertex = sink.get(i);
+                sinkID = sinkVertex.getID();
+
+                if (visited[sinkID]) {
+                    mineableBlocks.add(sinkVertex);
+                }
+            }
+
+            Collections.sort(mineableBlocks);
+
+            //------------------------------------------------------------------------------------------------------------------------
+            //Sort the mineable blocks list to get the correct order for the output list
+            Vertex nextVertex = null;
+
+            PrintWriter output = new PrintWriter(new File("blocks.txt"));
+            int currRowLevel = 0, nextRowLevel = 0;
+
+            for (int i = 0; i < mineableBlocks.size(); i++) {
+                currVertex = mineableBlocks.get(i);
+                blockID = currVertex.getID();
+
+                if (i + 1 == mineableBlocks.size()) {
+                    output.print(currVertex.getRowLevel());
+                    break;
+                }
+                currRowLevel = currVertex.getRowLevel();
+                nextVertex = mineableBlocks.get(i + 1);
+                nextRowLevel = nextVertex.getRowLevel();
+                if (nextRowLevel <= currRowLevel) {
+                    output.print(currRowLevel);
+                    output.println();
+                }
+                else {
+                    output.print(currRowLevel + ",");
+                }
+            }
+
+            output.close();
+        }
+        catch (FileNotFoundException ex) {
+            System.out.println(ex.toString());
+        }
+
+    }
+
+    public static Vertex[] findAvailableVertex(Vertex sourceVertex, HashMap<Integer, Vertex> hashMap,
+     HashMap<String, Integer> residualGraph) {
+        int blockID = sourceVertex.getID();
+        LinkedList<Vertex> linkedList = new LinkedList<Vertex>();
+        Vertex currVertex = null;
+        Vertex connectedToVertex = null;
+        Vertex connectedFromVertex = null;
+        int flowValue = 0, compareFlowValue = 0;
+        Vertex[] path = new Vertex[ARRAY_SIZE];
+        boolean[] added = new boolean[ARRAY_SIZE];
+        boolean[] visited = new boolean[ARRAY_SIZE];
+        hashMap.replace(FINAL_VERTEX, null);
+
+        linkedList.add(sourceVertex);
+
+        while (!linkedList.isEmpty()) {
+            currVertex = linkedList.poll();
+            blockID = currVertex.getID();
+            visited[blockID] = true;
+
+            for (int i = 0; i < currVertex.getConnectedToSize(); i++) {
+                connectedToVertex = currVertex.getConnectedTo(i);
+                blockID = connectedToVertex.getID();
+                if (visited[blockID]) {
+                    continue;
+                }
+                path[blockID] = currVertex;
+                flowValue = sinkArray[blockID];
+
+                if (connectedToVertex.getValue() < 0 && flowValue > 0) {
+                    hashMap.replace(FINAL_VERTEX, connectedToVertex);
+                    return path;
+                }
+                else if (!added[blockID]) {
+                    linkedList.add(connectedToVertex);
+                    added[blockID] = true;
+                }
+            }
+
+            if (!currVertex.equals(sourceVertex)) {
+                for (int i = 0; i < currVertex.getConnectedFromSize(); i++) {
+                    connectedFromVertex = currVertex.getConnectedFrom(i);
+                    blockID = connectedFromVertex.getID();
+                    if (visited[blockID]) {
+                        continue;
+                    }
+                    connectedString = currVertex.getID() + "," + blockID;
+                    flowValue = residualGraph.get(connectedString);
+
+                    if (flowValue > 0) {
+                        linkedList.add(connectedFromVertex);
+                        if (path[blockID] == null) {
+                            path[blockID] = currVertex;
+                        }
+                        else {
+                            connectedString = path[blockID].getID() + "," + blockID;
+                            compareFlowValue = residualGraph.get(connectedString);
+                            
+                            if (compareFlowValue != INFINITY) {
+                                if (flowValue > compareFlowValue) {
+                                    path[blockID] = currVertex;
+                                }
+                            } 
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    //DFS to go through all of the sources to find which ones are reachable from source
+    public static void DFS(HashMap<String, Integer> residualGraph, boolean[] visited, Vertex reachedVertex) {
+        Vertex connectedVertex = null;
+        int blockID = reachedVertex.getID();
+        visited[blockID] = true;
+
+        for (int i = 0; i < reachedVertex.getConnectedToSize(); i++) {
+            connectedVertex = reachedVertex.getConnectedTo(i);
+            blockID = connectedVertex.getID();
+            if (!visited[blockID]) {
+                DFS(residualGraph, visited, connectedVertex);
+            }
+        }
+
+        for (int i = 0; i < reachedVertex.getConnectedFromSize(); i++) {
+            connectedVertex = reachedVertex.getConnectedFrom(i);
+            blockID = connectedVertex.getID();
+            if (!visited[blockID]) {
+                connectedString = reachedVertex.getID() + "," + blockID;
+
+                int flowValue = residualGraph.get(connectedString);
+                if (flowValue != 0) {
+                    DFS(residualGraph, visited, connectedVertex);
+                }
+            }
+        }
+    }
+}
